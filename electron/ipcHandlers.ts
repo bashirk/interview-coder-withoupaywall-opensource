@@ -20,16 +20,16 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   ipcMain.handle("check-api-key", () => {
     return configHelper.hasApiKey();
   })
-  
+
   ipcMain.handle("validate-api-key", async (_event, apiKey) => {
     // First check the format
     if (!configHelper.isValidApiKeyFormat(apiKey)) {
-      return { 
-        valid: false, 
-        error: "Invalid API key format. OpenAI API keys start with 'sk-'" 
+      return {
+        valid: false,
+        error: "Invalid API key format. OpenAI API keys start with 'sk-'"
       };
     }
-    
+
     // Then test the API key with OpenAI
     const result = await configHelper.testApiKey(apiKey);
     return result;
@@ -90,7 +90,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   // Screenshot processing handlers
-  ipcMain.handle("process-screenshots", async () => {
+  ipcMain.handle("process-screenshots", async (event, mode: 'coding' | 'non-code') => {
     // Check for API key before processing
     if (!configHelper.hasApiKey()) {
       const mainWindow = deps.getMainWindow();
@@ -99,8 +99,8 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       }
       return;
     }
-    
-    await deps.processingHelper?.processScreenshots()
+
+    await deps.processingHelper?.processScreenshots(mode)
   })
 
   // Window dimension handlers
@@ -187,7 +187,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   ipcMain.handle("open-external-url", (event, url: string) => {
     shell.openExternal(url)
   })
-  
+
   // Open external URL handler
   ipcMain.handle("openLink", (event, url: string) => {
     try {
@@ -232,7 +232,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   // Process screenshot handlers
-  ipcMain.handle("trigger-process-screenshots", async () => {
+  ipcMain.handle("trigger-process-screenshots", async (event, mode: 'coding' | 'non-code') => {
     try {
       // Check for API key before processing
       if (!configHelper.hasApiKey()) {
@@ -242,8 +242,8 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
         }
         return { success: false, error: "API key required" };
       }
-      
-      await deps.processingHelper?.processScreenshots()
+
+      await deps.processingHelper?.processScreenshots(mode)
       return { success: true }
     } catch (error) {
       console.error("Error processing screenshots:", error)
@@ -318,30 +318,30 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { error: "Failed to move window down" }
     }
   })
-  
+
   // Delete last screenshot handler
   ipcMain.handle("delete-last-screenshot", async () => {
     try {
-      const queue = deps.getView() === "queue" 
-        ? deps.getScreenshotQueue() 
+      const queue = deps.getView() === "queue"
+        ? deps.getScreenshotQueue()
         : deps.getExtraScreenshotQueue()
-      
+
       if (queue.length === 0) {
         return { success: false, error: "No screenshots to delete" }
       }
-      
+
       // Get the last screenshot in the queue
       const lastScreenshot = queue[queue.length - 1]
-      
+
       // Delete it
       const result = await deps.deleteScreenshot(lastScreenshot)
-      
+
       // Notify the renderer about the change
       const mainWindow = deps.getMainWindow()
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("screenshot-deleted", { path: lastScreenshot })
       }
-      
+
       return result
     } catch (error) {
       console.error("Error deleting last screenshot:", error)

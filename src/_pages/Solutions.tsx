@@ -124,14 +124,14 @@ export const ComplexitySection = ({
     if (bigORegex.test(complexity)) {
       return complexity;
     }
-    
+
     // Concat Big O notation to the complexity
     return `O(${complexity})`;
   };
-  
+
   const formattedTimeComplexity = formatComplexity(timeComplexity);
   const formattedSpaceComplexity = formatComplexity(spaceComplexity);
-  
+
   return (
     <div className="space-y-2">
       <h2 className="text-[13px] font-medium text-white tracking-wide">
@@ -205,6 +205,13 @@ const Solutions: React.FC<SolutionsProps> = ({
   }
 
   const [extraScreenshots, setExtraScreenshots] = useState<Screenshot[]>([])
+
+  interface SolutionsResponse {
+    code: string | null
+    thoughts: string[]
+    time_complexity: string | null
+    space_complexity: string | null
+  }
 
   useEffect(() => {
     const fetchScreenshots = async () => {
@@ -300,7 +307,7 @@ const Solutions: React.FC<SolutionsProps> = ({
         setTimeComplexityData(null)
         setSpaceComplexityData(null)
       }),
-      window.electronAPI.onProblemExtracted((data) => {
+      window.electronAPI.onProblemExtracted((data: ProblemStatementData) => {
         queryClient.setQueryData(["problem_statement"], data)
       }),
       //if there was an error processing the initial solution
@@ -323,7 +330,7 @@ const Solutions: React.FC<SolutionsProps> = ({
         console.error("Processing error:", error)
       }),
       //when the initial solution is generated, we'll set the solution data to that
-      window.electronAPI.onSolutionSuccess((data) => {
+      window.electronAPI.onSolutionSuccess((data: SolutionsResponse) => {
         if (!data) {
           console.warn("Received empty or invalid solution data")
           return
@@ -347,7 +354,7 @@ const Solutions: React.FC<SolutionsProps> = ({
           try {
             const existing = await window.electronAPI.getScreenshots()
             const screenshots =
-              existing.previews?.map((p) => ({
+              existing.previews?.map((p: { path: string; preview: string }) => ({
                 id: p.path,
                 path: p.path,
                 preview: p.preview,
@@ -370,7 +377,7 @@ const Solutions: React.FC<SolutionsProps> = ({
         setDebugProcessing(true)
       }),
       //the first time debugging works, we'll set the view to debug and populate the cache with the data
-      window.electronAPI.onDebugSuccess((data) => {
+      window.electronAPI.onDebugSuccess((data: any) => {
         queryClient.setQueryData(["new_solution"], data)
         setDebugProcessing(false)
       }),
@@ -475,95 +482,99 @@ const Solutions: React.FC<SolutionsProps> = ({
       ) : (
         <div ref={contentRef} className="relative">
           <div className="space-y-3 px-4 py-3">
-          {/* Conditionally render the screenshot queue if solutionData is available */}
-          {solutionData && (
-            <div className="bg-transparent w-fit">
-              <div className="pb-3">
-                <div className="space-y-3 w-fit">
-                  <ScreenshotQueue
-                    isLoading={debugProcessing}
-                    screenshots={extraScreenshots}
-                    onDeleteScreenshot={handleDeleteExtraScreenshot}
-                  />
+            {/* Conditionally render the screenshot queue if thoughtsData is available (meaning we have a result) */}
+            {thoughtsData && (
+              <div className="bg-transparent w-fit">
+                <div className="pb-3">
+                  <div className="space-y-3 w-fit">
+                    <ScreenshotQueue
+                      isLoading={debugProcessing}
+                      screenshots={extraScreenshots}
+                      onDeleteScreenshot={handleDeleteExtraScreenshot}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Navbar of commands with the SolutionsHelper */}
-          <SolutionCommands
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
-            isProcessing={!problemStatementData || !solutionData}
-            extraScreenshots={extraScreenshots}
-            credits={credits}
-            currentLanguage={currentLanguage}
-            setLanguage={setLanguage}
-          />
+            {/* Navbar of commands with the SolutionsHelper */}
+            <SolutionCommands
+              onTooltipVisibilityChange={handleTooltipVisibilityChange}
+              isProcessing={!problemStatementData || !solutionData}
+              extraScreenshots={extraScreenshots}
+              credits={credits}
+              currentLanguage={currentLanguage}
+              setLanguage={setLanguage}
+            />
 
-          {/* Main Content - Modified width constraints */}
-          <div className="w-full text-sm text-black bg-black/60 rounded-md">
-            <div className="rounded-lg overflow-hidden">
-              <div className="px-4 py-3 space-y-4 max-w-full">
-                {!solutionData && (
-                  <>
-                    <ContentSection
-                      title="Problem Statement"
-                      content={problemStatementData?.problem_statement}
-                      isLoading={!problemStatementData}
-                    />
-                    {problemStatementData && (
-                      <div className="mt-4 flex">
-                        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-                          Generating solutions...
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
+            {/* Main Content - Modified width constraints */}
+            <div className="w-full text-sm text-black bg-black/60 rounded-md">
+              <div className="rounded-lg overflow-hidden">
+                <div className="px-4 py-3 space-y-4 max-w-full">
+                  {!thoughtsData && (
+                    <>
+                      <ContentSection
+                        title="Problem Statement"
+                        content={problemStatementData?.problem_statement}
+                        isLoading={!problemStatementData}
+                      />
+                      {problemStatementData && (
+                        <div className="mt-4 flex">
+                          <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+                            Generating solutions...
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                {solutionData && (
-                  <>
-                    <ContentSection
-                      title={`My Thoughts (${COMMAND_KEY} + Arrow keys to scroll)`}
-                      content={
-                        thoughtsData && (
-                          <div className="space-y-3">
-                            <div className="space-y-1">
-                              {thoughtsData.map((thought, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-start gap-2"
-                                >
-                                  <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
-                                  <div>{thought}</div>
-                                </div>
-                              ))}
+                  {thoughtsData && (
+                    <>
+                      <ContentSection
+                        title={`My Thoughts (${COMMAND_KEY} + Arrow keys to scroll)`}
+                        content={
+                          thoughtsData && (
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                {thoughtsData.map((thought, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-start gap-2"
+                                  >
+                                    <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
+                                    <div>{thought}</div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )
-                      }
-                      isLoading={!thoughtsData}
-                    />
+                          )
+                        }
+                        isLoading={!thoughtsData}
+                      />
 
-                    <SolutionSection
-                      title="Solution"
-                      content={solutionData}
-                      isLoading={!solutionData}
-                      currentLanguage={currentLanguage}
-                    />
+                      {solutionData && (
+                        <SolutionSection
+                          title="Solution"
+                          content={solutionData}
+                          isLoading={!solutionData}
+                          currentLanguage={currentLanguage}
+                        />
+                      )}
 
-                    <ComplexitySection
-                      timeComplexity={timeComplexityData}
-                      spaceComplexity={spaceComplexityData}
-                      isLoading={!timeComplexityData || !spaceComplexityData}
-                    />
-                  </>
-                )}
+                      {(timeComplexityData || spaceComplexityData) && (
+                        <ComplexitySection
+                          timeComplexity={timeComplexityData}
+                          spaceComplexity={spaceComplexityData}
+                          isLoading={false}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
     </>
   )

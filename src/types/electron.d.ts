@@ -33,7 +33,7 @@ export interface ElectronAPI {
   openExternal: (url: string) => void
   toggleMainWindow: () => Promise<{ success: boolean; error?: string }>
   triggerScreenshot: () => Promise<{ success: boolean; error?: string }>
-  triggerProcessScreenshots: () => Promise<{ success: boolean; error?: string }>
+  triggerProcessScreenshots: (mode?: 'coding' | 'non-code') => Promise<{ success: boolean; error?: string }>
   triggerReset: () => Promise<{ success: boolean; error?: string }>
   triggerMoveLeft: () => Promise<{ success: boolean; error?: string }>
   triggerMoveRight: () => Promise<{ success: boolean; error?: string }>
@@ -52,7 +52,7 @@ export interface ElectronAPI {
   onOutOfCredits: (callback: () => void) => () => void
   openSettingsPortal: () => Promise<void>
   getPlatform: () => string
-  
+
   // New methods for OpenAI integration
   getConfig: () => Promise<{ apiKey: string; model: string }>
   updateConfig: (config: { apiKey?: string; model?: string }) => Promise<boolean>
