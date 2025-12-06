@@ -1,10 +1,8 @@
-// ProcessingHelper.ts
 import fs from "node:fs"
-import path from "node:path"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { IProcessingHelperDeps } from "./main"
 import * as axios from "axios"
-import { app, BrowserWindow, dialog } from "electron"
+import { BrowserWindow } from "electron"
 import { OpenAI } from "openai"
 import { configHelper } from "./ConfigHelper"
 import Anthropic from '@anthropic-ai/sdk';

@@ -1,6 +1,6 @@
 // Solutions.tsx
 import React, { useState, useEffect, useRef } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
 
@@ -213,6 +213,14 @@ const Solutions: React.FC<SolutionsProps> = ({
     space_complexity: string | null
   }
 
+  interface DebugResponse {
+    code: string
+    debug_analysis: string
+    thoughts: string[]
+    time_complexity: string
+    space_complexity: string
+  }
+
   useEffect(() => {
     const fetchScreenshots = async () => {
       try {
@@ -377,7 +385,7 @@ const Solutions: React.FC<SolutionsProps> = ({
         setDebugProcessing(true)
       }),
       //the first time debugging works, we'll set the view to debug and populate the cache with the data
-      window.electronAPI.onDebugSuccess((data: any) => {
+      window.electronAPI.onDebugSuccess((data: DebugResponse) => {
         queryClient.setQueryData(["new_solution"], data)
         setDebugProcessing(false)
       }),
