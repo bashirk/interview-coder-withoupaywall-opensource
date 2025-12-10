@@ -515,13 +515,23 @@ export class ProcessingHelper {
           }
         ];
 
-        // Send to OpenAI Vision API
-        const extractionResponse = await this.openaiClient.chat.completions.create({
-          model: config.extractionModel || "gpt-4o",
-          messages: messages,
-          max_tokens: 4000,
-          temperature: 0.2
-        });
+        let extractionResponse;
+
+        try {
+          // Send to OpenAI Vision API
+          extractionResponse = await this.openaiClient.chat.completions.create({
+            model: config.extractionModel || "gpt-4o",
+            messages: messages,
+            max_tokens: 4000,
+            temperature: 0.2
+          });
+        } catch (error: any) {
+          console.error("OpenAI API Error:", error);
+          if (error?.status === 400 && error?.message?.includes('image')) {
+            return { success: false, error: "OpenAI rejected the images. Try clearer screenshots." };
+          }
+          throw error; // Bubble up to outer catch for generic handling
+        }
 
         if (mainWindow) {
           mainWindow.webContents.send("processing-status", {
@@ -533,9 +543,20 @@ export class ProcessingHelper {
         // Parse the response
         try {
           const responseText = extractionResponse.choices[0].message.content;
+          console.log("OpenAI Raw Response (First 500 chars):", responseText?.substring(0, 500));
+
+          if (!responseText) {
+            throw new Error("Empty response from OpenAI");
+          }
+
           problemInfo = this.extractJSON(responseText) as any;
         } catch (error) {
           console.error("Error parsing OpenAI response:", error);
+          // Log the full response to help debugging if possible (be careful with PII)
+          if (extractionResponse?.choices[0]?.message?.content) {
+            console.error("Failed Response Content:", extractionResponse.choices[0].message.content);
+          }
+
           return {
             success: false,
             error: "Failed to parse problem information. Please try again or use clearer screenshots."
