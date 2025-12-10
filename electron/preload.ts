@@ -149,8 +149,8 @@ const electronAPI = {
   // External URL handler
   openLink: (url: string) => shell.openExternal(url),
   triggerScreenshot: () => ipcRenderer.invoke("trigger-screenshot"),
-  triggerProcessScreenshots: () =>
-    ipcRenderer.invoke("trigger-process-screenshots"),
+  triggerProcessScreenshots: (mode?: 'coding' | 'non-code') =>
+    ipcRenderer.invoke("trigger-process-screenshots", mode),
   triggerReset: () => ipcRenderer.invoke("trigger-reset"),
   triggerMoveLeft: () => ipcRenderer.invoke("trigger-move-left"),
   triggerMoveRight: () => ipcRenderer.invoke("trigger-move-right"),
@@ -202,10 +202,10 @@ const electronAPI = {
     }
   },
   getPlatform: () => process.platform,
-  
+
   // New methods for OpenAI API integration
   getConfig: () => ipcRenderer.invoke("get-config"),
-  updateConfig: (config: { apiKey?: string; model?: string; language?: string; opacity?: number }) => 
+  updateConfig: (config: { apiKey?: string; model?: string; language?: string; opacity?: number }) =>
     ipcRenderer.invoke("update-config", config),
   onShowSettings: (callback: () => void) => {
     const subscription = () => callback()
@@ -215,9 +215,9 @@ const electronAPI = {
     }
   },
   checkApiKey: () => ipcRenderer.invoke("check-api-key"),
-  validateApiKey: (apiKey: string) => 
+  validateApiKey: (apiKey: string) =>
     ipcRenderer.invoke("validate-api-key", apiKey),
-  openExternal: (url: string) => 
+  openExternal: (url: string) =>
     ipcRenderer.invoke("openExternal", url),
   onApiKeyInvalid: (callback: () => void) => {
     const subscription = () => callback()

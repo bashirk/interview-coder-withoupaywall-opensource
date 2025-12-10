@@ -1,7 +1,6 @@
 // ipcHandlers.ts
 
-import { ipcMain, shell, dialog } from "electron"
-import { randomBytes } from "crypto"
+import { ipcMain, shell } from "electron"
 import { IIpcHandlerDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
 
@@ -43,7 +42,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
     try {
       // Set the credits in a way that ensures atomicity
       await mainWindow.webContents.executeJavaScript(
-        `window.__CREDITS__ = ${credits}`
+        `window.__CREDITS__ = ${ credits } `
       )
       mainWindow.webContents.send("credits-updated", credits)
     } catch (error) {
@@ -63,7 +62,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       if (currentCredits > 0) {
         const newCredits = currentCredits - 1
         await mainWindow.webContents.executeJavaScript(
-          `window.__CREDITS__ = ${newCredits}`
+          `window.__CREDITS__ = ${ newCredits } `
         )
         mainWindow.webContents.send("credits-updated", newCredits)
       }
@@ -191,12 +190,12 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   // Open external URL handler
   ipcMain.handle("openLink", (event, url: string) => {
     try {
-      console.log(`Opening external URL: ${url}`);
+      console.log(`Opening external URL: ${ url } `);
       shell.openExternal(url);
       return { success: true };
     } catch (error) {
-      console.error(`Error opening URL ${url}:`, error);
-      return { success: false, error: `Failed to open URL: ${error}` };
+      console.error(`Error opening URL ${ url }: `, error);
+      return { success: false, error: `Failed to open URL: ${ error } ` };
     }
   })
 
@@ -233,6 +232,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Process screenshot handlers
   ipcMain.handle("trigger-process-screenshots", async (event, mode: 'coding' | 'non-code') => {
+    console.log("Triggering process screenshots with mode:", mode);
     try {
       // Check for API key before processing
       if (!configHelper.hasApiKey()) {

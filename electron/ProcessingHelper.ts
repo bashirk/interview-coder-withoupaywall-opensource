@@ -209,6 +209,7 @@ export class ProcessingHelper {
   }
 
   public async processScreenshots(mode: 'coding' | 'non-code' = 'coding'): Promise<void> {
+    console.log("ProcessingHelper received mode:", mode);
     const mainWindow = this.deps.getMainWindow()
     if (!mainWindow) return
 
