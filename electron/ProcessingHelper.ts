@@ -581,7 +581,7 @@ export class ProcessingHelper {
                 {
                   text: mode === 'coding'
                     ? `You are a coding challenge interpreter. Analyze the screenshots of the coding problem and extract all relevant information. Return the information in JSON format with these fields: problem_statement, constraints, example_input, example_output. Just return the structured JSON without any other text. Preferred coding language we gonna use for this problem is ${language}.`
-                    : "You are a generic text extractor. Analyze the screenshots and extract the question or text. Return the information in JSON format with these fields: problem_statement (the main text/question), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text."
+                    : "You are a generic text extractor. Analyze the screenshots and extract all relevant information; noting that the screenshots form up an exercise or task to provide or select an answer for. Return the information in JSON format with these fields: problem_statement (the text/question you understand is being asked), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text."
                 },
                 ...imageDataList.map(data => ({
                   inlineData: {
