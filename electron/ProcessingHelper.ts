@@ -461,7 +461,46 @@ export class ProcessingHelper {
       const language = await this.getLanguage();
       const mainWindow = this.deps.getMainWindow();
 
-      // Step 1: Extract problem info using AI Vision API (OpenAI or Gemini)
+      // Step 1: Check if we are in non-code mode to skip extraction
+      if (mode === 'non-code') {
+        const screenshotsData = screenshots.map(s => s.data);
+
+        // Skip extraction and go directly to solution generation
+        // But we need to pass the screenshots to generateSolutionsHelper
+
+        if (mainWindow) {
+          mainWindow.webContents.send("processing-status", {
+            message: "Analyzing screenshots directly...",
+            progress: 30
+          });
+        }
+
+        const solutionsResult = await this.generateSolutionsHelper(signal, mode, screenshots);
+
+        if (solutionsResult.success) {
+          // Clear any existing extra screenshots before transitioning to solutions view
+          this.screenshotHelper.clearExtraScreenshotQueue();
+
+          // Final progress update
+          if (mainWindow) {
+            mainWindow.webContents.send("processing-status", {
+              message: "Solution generated successfully",
+              progress: 100
+            });
+
+            mainWindow.webContents.send(
+              this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS,
+              solutionsResult.data
+            );
+          }
+          return { success: true, data: solutionsResult.data };
+        } else {
+          // Handle error
+          throw new Error(solutionsResult.error || "Failed to generate solution");
+        }
+      }
+
+      // Step 1: Extract problem info using AI Vision API (OpenAI or Gemini) -- Only for coding mode now
       const imageDataList = screenshots.map(screenshot => screenshot.data);
 
       // Update the user on progress
@@ -490,11 +529,11 @@ export class ProcessingHelper {
         // Use OpenAI for processing
         const systemPrompt = mode === 'coding'
           ? "You are a coding challenge interpreter. Analyze the screenshot of the coding problem and extract all relevant information. Return the information in JSON format with these fields: problem_statement, constraints, example_input, example_output. Just return the structured JSON without any other text."
-          : "You are a generic text extractor. Analyze the screenshot and extract the question or text. Return the information in JSON format with these fields: problem_statement (the main text/question), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text.";
+          : "You are a generic text extractor. Analyze the screenshot and extract the question and all other options on the screen. Note that questions are sometimes on the left and options with a likely answer on the right. Return the information in JSON format with these fields: problem_statement (the main text/question), options (array of strings, if applicable), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text.";
 
         const userPrompt = mode === 'coding'
           ? `Extract the coding problem details from these screenshots. Return in JSON format. Preferred coding language we gonna use for this problem is ${language}.`
-          : "Extract the text/question from these screenshots. Return in JSON format.";
+          : "Extract the text/question and all other options on the screen from these screenshots. Return in JSON format.";
 
         const messages = [
           {
@@ -581,7 +620,7 @@ export class ProcessingHelper {
                 {
                   text: mode === 'coding'
                     ? `You are a coding challenge interpreter. Analyze the screenshots of the coding problem and extract all relevant information. Return the information in JSON format with these fields: problem_statement, constraints, example_input, example_output. Just return the structured JSON without any other text. Preferred coding language we gonna use for this problem is ${language}.`
-                    : "You are a generic text extractor. Analyze the screenshots and extract all relevant information; noting that the screenshots form up an exercise or task to provide or select an answer for. Return the information in JSON format with these fields: problem_statement (the text/question you understand is being asked), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text."
+                    : "You are a generic text extractor. Analyze the screenshot and extract the question and all other options on the screen. Note that questions are sometimes on the left and options with a likely answer on the right. Return the information in JSON format with these fields: problem_statement (the main text/question), options (array of strings, if applicable), constraints (optional), example_input (optional), example_output (optional). Just return the structured JSON without any other text."
                 },
                 ...imageDataList.map(data => ({
                   inlineData: {
@@ -645,7 +684,7 @@ export class ProcessingHelper {
                   type: "text" as const,
                   text: mode === 'coding'
                     ? `Extract the coding problem details from these screenshots. Return in JSON format with these fields: problem_statement, constraints, example_input, example_output. Preferred coding language is ${language}.`
-                    : "Extract the text/question from these screenshots. Return in JSON format with these fields: problem_statement, constraints, example_input, example_output."
+                    : "Extract the text/question and options from these screenshots. Handle layouts with questions on the left and options on the right. Return in JSON format with these fields: problem_statement, options (array), constraints, example_input, example_output."
                 },
                 ...imageDataList.map(data => ({
                   type: "image" as const,
@@ -776,14 +815,18 @@ export class ProcessingHelper {
     }
   }
 
-  private async generateSolutionsHelper(signal: AbortSignal, mode: 'coding' | 'non-code') {
+  private async generateSolutionsHelper(
+    signal: AbortSignal,
+    mode: 'coding' | 'non-code',
+    screenshots: Array<{ path: string; data: string }> | null = null
+  ) {
     try {
       const problemInfo = this.deps.getProblemInfo();
       const language = await this.getLanguage();
       const config = configHelper.loadConfig();
       const mainWindow = this.deps.getMainWindow();
 
-      if (!problemInfo) {
+      if (!problemInfo && (!screenshots || screenshots.length === 0)) {
         throw new Error("No problem info available");
       }
 
@@ -794,6 +837,9 @@ export class ProcessingHelper {
           progress: 60
         });
       }
+
+      // Prepare images for solution generation (if provided)
+      const imageDataList = screenshots ? screenshots.map(s => s.data) : [];
 
       // Create prompt for solution generation
       let promptText = "";
@@ -839,22 +885,43 @@ For complexity explanations, please be thorough.
 Your solution should be efficient, well-commented, and handle edge cases.
 `;
       } else {
-        // Non-code mode prompt
-        promptText = `
+        // Non-code mode prompt - simplified for direct screenshot analysis
+        if (screenshots && screenshots.length > 0) {
+          promptText = `
+Analyze the screenshots to find the question and all options.
+Identify the correct answer.
+
+YOUR RESPONSE MUST BE IN THIS FORMAT:
+- First, state the Correct Answer clearly.
+- Then, perform a step-by-step analysis explaining WHY this option is correct and why others are incorrect.
+
+Directly answer the question from the screenshots. Only provide the answer and explanation.
+`;
+        } else {
+          // Fallback if no screenshots passed (shouldn't happen with new flow, but safe to keep)
+          promptText = `
 Answer the following question or problem details extracted from a screenshot:
 
 PROBLEM/QUESTION:
 ${problemInfo.problem_statement}
 
+${problemInfo.options && problemInfo.options.length > 0 ? `OPTIONS:
+${problemInfo.options.map((opt: string, i: number) => `${i + 1}. ${opt}`).join('\n')}
+
+INSTRUCTION:
+Based on the problem and the provided information, provide the correct answer.` : ""}
+
 CONTEXT/CONSTRAINTS:
 ${problemInfo.constraints || "No specific constraints provided."}
 
 Please provide a clear, concise, and accurate answer in plain English. 
+${problemInfo.options && problemInfo.options.length > 0 ? "Explicitly state which option is correct and explain why." : ""}
 Since this is "Non-Code" mode, do NOT generate code or complexity analysis unless specifically asked for in the problem description. 
 Just provide the best answer and explanation.
 
-Format your response as a list of "thoughts" or paragraphs that directly answer the question.
+Directly answer the question or problem details extracted from the screenshot.
 `;
+        }
       }
 
       let responseContent;
@@ -873,7 +940,16 @@ Format your response as a list of "thoughts" or paragraphs that directly answer 
           model: config.solutionModel || "gpt-4o",
           messages: [
             { role: "system", content: "You are an expert coding interview assistant. Provide clear, optimal solutions with detailed explanations." },
-            { role: "user", content: promptText }
+            {
+              role: "user",
+              content: [
+                { type: "text", text: promptText },
+                ...imageDataList.map(data => ({
+                  type: "image_url" as const,
+                  image_url: { url: `data:image/png;base64,${data}` }
+                }))
+              ]
+            }
           ],
           max_tokens: 4000,
           temperature: 0.2
@@ -891,13 +967,20 @@ Format your response as a list of "thoughts" or paragraphs that directly answer 
 
         try {
           // Create Gemini message structure
-          const geminiMessages = [
+          // Create Gemini message structure
+          const geminiMessages: GeminiMessage[] = [
             {
               role: "user",
               parts: [
                 {
                   text: `You are an expert coding interview assistant. Provide a clear, optimal solution with detailed explanations for this problem:\n\n${promptText}`
-                }
+                },
+                ...imageDataList.map(data => ({
+                  inlineData: {
+                    mimeType: "image/png",
+                    data: data
+                  }
+                }))
               ]
             }
           ];
@@ -946,7 +1029,15 @@ Format your response as a list of "thoughts" or paragraphs that directly answer 
                 {
                   type: "text" as const,
                   text: `You are an expert coding interview assistant. Provide a clear, optimal solution with detailed explanations for this problem:\n\n${promptText}`
-                }
+                },
+                ...imageDataList.map(data => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: "image/png" as const,
+                    data: data
+                  }
+                }))
               ]
             }
           ];
